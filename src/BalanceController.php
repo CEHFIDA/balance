@@ -16,7 +16,7 @@ class BalanceController extends Controller
     */    
     public function index()
     {
-    	$payment_system = Payment_System::orderBy('sort', 'asc')->get();
+    	$payment_system = Payment_System::where('class_name', '<>', '')->orderBy('sort', 'asc')->get();
     	// dd($payment_system);
         return view('balance::index')->with([
         	"payment_system" => $payment_system
