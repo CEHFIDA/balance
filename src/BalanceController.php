@@ -8,6 +8,7 @@ use Illuminate\Http\Request;
 use App\Models\Payment_System;
 use App\Models\Currency_Rate;
 
+use PaymentSystem;
 class BalanceController extends Controller
 {
     /**
@@ -16,8 +17,8 @@ class BalanceController extends Controller
     */    
     public function index()
     {
-    	$payment_system = Payment_System::where('class_name', '<>', '')->orderBy('sort', 'asc')->get();
-    	// dd($payment_system);
+    	// $payment_system = Payment_System::where('class_name', '<>', '')->orderBy('sort', 'asc')->get();
+        $payment_system = PaymentSystem::get_uniq(1,1);
         return view('balance::index')->with([
         	"payment_system" => $payment_system
         ]);
@@ -25,7 +26,8 @@ class BalanceController extends Controller
 
     public function loadbalance($id){
         try{
-            $payment = Payment_System::where('id', $id)->firstOrFail();
+            $id = explode(',',$id);
+            $payment = Payment_System::where('id', $id[0])->firstOrFail();
             
             $temp = $payment->class_name;
             if (!class_exists($temp)) {
