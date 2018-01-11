@@ -7,21 +7,111 @@ use App\User;
 use Illuminate\Http\Request;
 use App\Models\Payment_System;
 use App\Models\Currency_Rate;
-
+use DepositService;
 use PaymentSystem;
+use Withdraw;
+use Referral;
+use App\Libraries\DepositProfit\DepositProfit;
+use Carbon\Carbon;
 class BalanceController extends Controller
 {
     /**
      * Index
      * @return view home with feedback messages
     */    
-    public function index()
+    public function index(DepositProfit $DepositProfit, Request $request)
     {
-    	// $payment_system = Payment_System::where('class_name', '<>', '')->orderBy('sort', 'asc')->get();
+        $total_deposits = DepositService::total_amount();
+        $total_withdraw = Withdraw::total_withdraw();
+        $total_referral = Referral::sum_total_refereals();
+        $total_accurrals = $DepositProfit->sum_total_accurals();
+
+        $from_date = ($request->input('from'))?$request->input('from'):null;
+        $to_date = ($request->input('to'))?$request->input('to'):null;
+
+        if($from_date == null)
+            $startOfMonth = Carbon::now()->startOfMonth();    
+        else
+            $startOfMonth = Carbon::parse($from_date);    
+
+        if($from_date == null)
+            $endOfMonth = Carbon::now()->endOfMonth();
+        else
+            $endOfMonth = Carbon::parse($to_date);    
+        
+        
+
+        $purcharse = DepositService::get_deposit_for_chart($startOfMonth, $endOfMonth);
+        $withdraw = Withdraw::get_withdraw_for_chart($startOfMonth, $endOfMonth);
+
+        $data_for_chart = DepositService::create_calendar_zeros_chart($startOfMonth, $endOfMonth);
+        $max_value_chart = 0;
+        foreach($data_for_chart as $key=>$row){
+            if(array_key_exists($key, $purcharse)){
+                $data_for_chart[$key]['purchase'] = $purcharse[$key];
+                if($purcharse[$key] > $max_value_chart) $max_value_chart = $purcharse[$key];
+            }
+
+            if(array_key_exists($key, $withdraw)){
+                $data_for_chart[$key]['withdraw'] = $withdraw[$key];
+                if($withdraw[$key] > $max_value_chart) $max_value_chart = $withdraw[$key];
+            }
+        }
+        $payment_system_list = PaymentSystem::list(1,1);
+        $today = DepositService::get_group_by_payment_system(Carbon::today(), Carbon::today());
+        $week = DepositService::get_group_by_payment_system(Carbon::today()->subDays(7), Carbon::today());
+        $month = DepositService::get_group_by_payment_system(Carbon::today()->subDays(31), Carbon::today());
+        $total = DepositService::get_group_by_payment_system(false, false);
+
+        $today = DepositService::get_group_by_payment_system(Carbon::today());
+        
+        $total = DepositService::get_group_by_payment_system(false);
+        
+        $purcharse = [];
+        foreach($payment_system_list as $row){
+            $purcharse[] = [
+                'title'    => $row->title,
+                'currency' => $row->currency,
+                'id'       => $row->id,
+                'data' => [
+                    'today' => (array_key_exists($row->id, $today))?$today[$row->id]:0,
+                    'week' => (array_key_exists($row->id, $week))?$week[$row->id]:0,
+                    'month' => (array_key_exists($row->id, $month))?$month[$row->id]:0,
+                    'total' => (array_key_exists($row->id, $total))?$total[$row->id]:0
+                ]
+            ];
+        }        
+
         $payment_system = PaymentSystem::get_uniq(1,1);
-        return view('balance::index')->with([
-        	"payment_system" => $payment_system
-        ]);
+        $withdraw = [];
+        foreach($payment_system as $row){
+            if($row->title == 'Bitcoin'){
+                $currency = 'BTC';
+            }
+            if($row->title == 'Ethereum'){
+                $currency = 'ETH';
+            }
+            if($row->title == 'Dashcoin'){
+                $currency = 'DASH';
+            }
+            if($row->title == 'Litecoin'){
+                $currency = 'LTC';
+            }
+            $withdraw[] = [
+                'title'    => $row->title,
+                'currency' => $currency,
+                'data' => [
+                    'today' => Withdraw::get_by_payment_systems_ids(Carbon::today(), Carbon::today(), explode(',',$row->payment_systems_in)),
+                    'week' => Withdraw::get_by_payment_systems_ids(Carbon::today()->subDays(7), Carbon::today(), explode(',',$row->payment_systems_in)),
+                    'month' => Withdraw::get_by_payment_systems_ids(Carbon::today()->subDays(31), Carbon::today(), explode(',',$row->payment_systems_in)),
+                    'total' => Withdraw::get_by_payment_systems_ids(false, false, explode(',',$row->payment_systems_in))
+                ]
+            ];
+        }
+
+        return view('balance::index')->with(compact(
+        	'payment_system', 'total_deposits', 'total_withdraw', 'total_referral', 'total_accurrals', 'data_for_chart', 'max_value_chart', 'startOfMonth', 'endOfMonth', 'purcharse', 'withdraw'
+        ));
     }
 
     public function loadbalance($id){
