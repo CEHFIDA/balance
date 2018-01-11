@@ -62,11 +62,7 @@ class BalanceController extends Controller
         $week = DepositService::get_group_by_payment_system(Carbon::today()->subDays(7), Carbon::today());
         $month = DepositService::get_group_by_payment_system(Carbon::today()->subDays(31), Carbon::today());
         $total = DepositService::get_group_by_payment_system(false, false);
-
-        $today = DepositService::get_group_by_payment_system(Carbon::today());
-        
-        $total = DepositService::get_group_by_payment_system(false);
-        
+                
         $purcharse = [];
         foreach($payment_system_list as $row){
             $purcharse[] = [
