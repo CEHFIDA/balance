@@ -81,18 +81,7 @@ class BalanceController extends Controller
         $payment_system = PaymentSystem::get_uniq(1,1);
         $withdraw = [];
         foreach($payment_system as $row){
-            if($row->title == 'Bitcoin'){
-                $currency = 'BTC';
-            }
-            if($row->title == 'Ethereum'){
-                $currency = 'ETH';
-            }
-            if($row->title == 'Dashcoin'){
-                $currency = 'DASH';
-            }
-            if($row->title == 'Litecoin'){
-                $currency = 'LTC';
-            }
+            $currency = PaymentSystem::get_origin_currency($row->title);
             $withdraw[] = [
                 'title'    => $row->title,
                 'currency' => $currency,
