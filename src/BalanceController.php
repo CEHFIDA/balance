@@ -19,12 +19,14 @@ class BalanceController extends Controller
      * Index
      * @return view home with feedback messages
     */    
-    public function index(DepositProfit $DepositProfit, Request $request)
+    public function index(Request $request)
     {
-        $total_deposits = DepositService::total_amount();
+        // $total_deposits = DepositService::total_amount();
+        $total_deposits = 0;
         $total_withdraw = Withdraw::total_withdraw();
         $total_referral = Referral::sum_total_refereals();
-        $total_accurrals = $DepositProfit->sum_total_accurals();
+        // $total_accurrals = $DepositProfit->sum_total_accurals();
+        $total_accurrals = 0;
 
         $from_date = ($request->input('from'))?$request->input('from'):null;
         $to_date = ($request->input('to'))?$request->input('to'):null;
@@ -41,10 +43,11 @@ class BalanceController extends Controller
         
         
 
-        $purcharse = DepositService::get_deposit_for_chart($startOfMonth, $endOfMonth);
+        // $purcharse = DepositService::get_deposit_for_chart($startOfMonth, $endOfMonth);
+        $purcharse = [];
         $withdraw = Withdraw::get_withdraw_for_chart($startOfMonth, $endOfMonth);
 
-        $data_for_chart = DepositService::create_calendar_zeros_chart($startOfMonth, $endOfMonth);
+        $data_for_chart = create_calendar_zeros_chart($startOfMonth, $endOfMonth);
         $max_value_chart = 0;
         foreach($data_for_chart as $key=>$row){
             if(array_key_exists($key, $purcharse)){
@@ -57,14 +60,15 @@ class BalanceController extends Controller
                 if($withdraw[$key] > $max_value_chart) $max_value_chart = $withdraw[$key];
             }
         }
-        $payment_system_list = PaymentSystem::list(1,1);
-        $today = DepositService::get_group_by_payment_system(Carbon::today(), Carbon::today());
-        $week = DepositService::get_group_by_payment_system(Carbon::today()->subDays(7), Carbon::today());
-        $month = DepositService::get_group_by_payment_system(Carbon::today()->subDays(31), Carbon::today());
-        $total = DepositService::get_group_by_payment_system(false, false);
+        $payment_system = PaymentSystem::getAll('asc');
+        
+        $today = get_group_by_payment_system(Carbon::today(), Carbon::today());
+        $week = get_group_by_payment_system(Carbon::today()->subDays(7), Carbon::today());
+        $month = get_group_by_payment_system(Carbon::today()->subDays(31), Carbon::today());
+        $total = get_group_by_payment_system(false, false);
                 
         $purcharse = [];
-        foreach($payment_system_list as $row){
+        foreach($payment_system as $row){
             $purcharse[] = [
                 'title'    => $row->title,
                 'currency' => $row->currency,
@@ -78,21 +82,35 @@ class BalanceController extends Controller
             ];
         }        
 
-        $payment_system = PaymentSystem::get_uniq(1,1);
+
         $withdraw = [];
         foreach($payment_system as $row){
-            $currency = PaymentSystem::get_origin_currency($row->title);
             $withdraw[] = [
                 'title'    => $row->title,
-                'currency' => $currency,
+                'currency' => $row->currency,
+                'id'       => $row->id,
                 'data' => [
-                    'today' => Withdraw::get_by_payment_systems_ids(Carbon::today(), Carbon::today(), explode(',',$row->payment_systems_in)),
-                    'week' => Withdraw::get_by_payment_systems_ids(Carbon::today()->subDays(7), Carbon::today(), explode(',',$row->payment_systems_in)),
-                    'month' => Withdraw::get_by_payment_systems_ids(Carbon::today()->subDays(31), Carbon::today(), explode(',',$row->payment_systems_in)),
-                    'total' => Withdraw::get_by_payment_systems_ids(false, false, explode(',',$row->payment_systems_in))
+                    'today' => Withdraw::get_by_payment_systems_ids(Carbon::today(), Carbon::today(), explode(',',$row->id)),
+                    'week' => Withdraw::get_by_payment_systems_ids(Carbon::today()->subDays(7), Carbon::today(), explode(',',$row->id)),
+                    'month' => Withdraw::get_by_payment_systems_ids(Carbon::today()->subDays(31), Carbon::today(), explode(',',$row->id)),
+                    'total' => Withdraw::get_by_payment_systems_ids(false, false, explode(',',$row->id))
                 ]
             ];
-        }
+        }        
+
+        // foreach($payment_system as $row){
+        //     $currency = PaymentSystem::get_origin_currency($row->title);
+        //     $withdraw[] = [
+        //         'title'    => $row->title,
+        //         'currency' => $currency,
+        //         'data' => [
+        //             'today' => Withdraw::get_by_payment_systems_ids(Carbon::today(), Carbon::today(), explode(',',$row->payment_systems_in)),
+        //             'week' => Withdraw::get_by_payment_systems_ids(Carbon::today()->subDays(7), Carbon::today(), explode(',',$row->payment_systems_in)),
+        //             'month' => Withdraw::get_by_payment_systems_ids(Carbon::today()->subDays(31), Carbon::today(), explode(',',$row->payment_systems_in)),
+        //             'total' => Withdraw::get_by_payment_systems_ids(false, false, explode(',',$row->payment_systems_in))
+        //         ]
+        //     ];
+        // }
 
         return view('balance::index')->with(compact(
         	'payment_system', 'total_deposits', 'total_withdraw', 'total_referral', 'total_accurrals', 'data_for_chart', 'max_value_chart', 'startOfMonth', 'endOfMonth', 'purcharse', 'withdraw'
@@ -101,9 +119,8 @@ class BalanceController extends Controller
 
     public function loadbalance($id){
         try{
-            $id = explode(',',$id);
-            $payment = Payment_System::where('id', $id[0])->firstOrFail();
-            
+            $payment = PaymentSystem::getAll()->where('id', $id)->first();
+
             $temp = $payment->class_name;
             if (!class_exists($temp)) {
                 throw new \Exception('Empty payment module');
